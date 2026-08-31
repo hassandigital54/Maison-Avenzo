@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 
 /* ── RESET & BASE ─────────────────────── */
@@ -1125,21 +1124,21 @@ async function submitOrder() {
   try { await addDoc(collection(db,'commandes'), orderData); }
   catch(e) { console.warn('Commande non enregistrée sur Firestore', e); }
 
-  /* ─── Notification automatique par email au vendeur (invisible pour le client) ─── */
-  try {
-    const itemsTxt = window.CART.map(i => `${i.n}${i.taille && i.taille!=='Taille unique' ? ' (Taille '+i.taille+')' : ''} x${i.qty} — ${fmt(i.p*i.qty)}`).join('\n');
-    emailjs.send('VOTRE_SERVICE_ID', 'VOTRE_TEMPLATE_ID', {
-      order_number: orderNumber,
-      client_nom: `${fname} ${lname}`,
-      client_telephone: '+225 ' + phone,
-      adresse: d.label,
-      note: note || '—',
-      articles: itemsTxt,
-      sous_total: fmt(sub),
-      livraison: fmt(d.price),
-      total: fmt(total)
-    }, 'VOTRE_PUBLIC_KEY');
-  } catch(e) { console.warn('Notification email non envoyée', e); }
+  /* ─── Envoi automatique de la commande complète sur WhatsApp ─── */
+  const itemsTxt = window.CART.map(i => `• ${i.n}${i.taille && i.taille!=='Taille unique' ? ' (Taille '+i.taille+')' : ''} x${i.qty} — ${fmt(i.p*i.qty)}`).join('\n');
+  const msg = encodeURIComponent(
+    `Nouvelle commande MAISON AVENZO\n`+
+    `N° commande : ${orderNumber}\n\n`+
+    `Client : ${fname} ${lname}\n`+
+    `Téléphone : +225 ${phone}\n`+
+    `Adresse : ${d.label}\n`+
+    (note ? `Précisions : ${note}\n` : '')+
+    `\nArticles :\n${itemsTxt}\n\n`+
+    `Sous-total : ${fmt(sub)}\n`+
+    `Livraison (${d.distanceKm.toFixed(1)} km) : ${fmt(d.price)}\n`+
+    `TOTAL à payer à la livraison : ${fmt(total)}`
+  );
+  window.open(`https://wa.me/${WA_NUM}?text=${msg}`,'_blank');
 
   document.getElementById('s-ordernum').textContent = orderNumber;
   window.CART = []; saveCart(); window.selectedDelivery = null;
