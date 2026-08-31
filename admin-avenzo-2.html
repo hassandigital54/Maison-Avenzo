@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>MAISON AVENZO — Gestion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: #FAFAF8; }
+body { font-family: 'Syne', sans-serif; background: #FAFAF8; color: #121212; min-height: 100vh; }
+:root {
+  --gold: #141414; --n2: #FFFFFF; --n3: #F0F0EE; --n4: #E4E3DF; --n5: #D8D7D2;
+  --goldg: linear-gradient(135deg, #000000 0%, #141414 45%, #3A3A3A 100%);
+  --muted: #6B6B6B; --muted2: #9A9A9A; --ok:#22c55e; --err:#ef4444;
+  --line: rgba(10,10,10,0.13); --line2: rgba(10,10,10,0.28);
+  --r: 6px; --r2: 12px;
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --slow: cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+a { color:inherit; text-decoration:none; }
+
+/* PW GATE — plein écran */
+#pw-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+.pw-box { background: #FFFFFF; border: 1px solid var(--line2); border-radius: var(--r2); padding: 40px 30px; width: 100%; max-width: 340px; text-align: center; animation: modalIn 0.3s var(--slow); box-shadow: 0 24px 64px rgba(10,10,10,0.1); }
+.pw-icon { color: var(--gold); margin-bottom: 12px; display: flex; justify-content: center; }
+.pw-icon svg { width: 30px; height: 30px; }
+.pw-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; margin-bottom: 5px; }
+.pw-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 20px; }
+.pw-input { width: 100%; padding: 11px 14px; background: #F0F0EE; border: 1px solid var(--line2); border-radius: var(--r); font-size: 15px; text-align: center; letter-spacing: 5px; color: #121212; outline: none; margin-bottom: 9px; transition: 0.2s; }
+.pw-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(10,10,10,0.1); }
+.pw-btn { width: 100%; padding: 11px; background: var(--goldg); color: #ffffff; border: none; border-radius: var(--r); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+.pw-btn:hover { box-shadow: 0 4px 18px rgba(10,10,10,0.4); }
+.pw-err { font-size: 11.5px; color: var(--err); margin-top: 7px; display: none; }
+.pw-back { display:inline-block; margin-top:16px; font-size:11.5px; color:var(--muted); }
+.pw-back:hover { color: var(--gold); }
+
+/* ADMIN — plein écran, sections par onglet (pas de fenêtre popup) */
+#admin-screen { display:none; min-height:100vh; }
+#admin-screen.open { display:block; }
+.admin-top { position:sticky; top:0; z-index:50; background:rgba(250,250,248,0.97); backdrop-filter:blur(18px); border-bottom:1px solid var(--line); padding: 16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.admin-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+.admin-title em { font-style: italic; color: var(--gold); }
+.admin-title small { display: block; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-top: 2px; }
+.top-actions { display:flex; align-items:center; gap:10px; }
+.logout-btn { padding: 8px 16px; background: var(--n3); border: 1px solid var(--line); border-radius: 50px; font-size: 10.5px; font-weight: 700; cursor: pointer; color: var(--muted); }
+.logout-btn:hover { color: #121212; }
+.view-site-link { padding:8px 16px; background:var(--goldg); color:#fff; border-radius:50px; font-size:10.5px; font-weight:700; }
+
+.admin-tabs { display: flex; gap:4px; border-bottom: 1px solid var(--line); padding: 0 20px; overflow-x:auto; background:#fff; }
+.atab { padding: 13px 16px; background: none; border: none; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; white-space:nowrap; }
+.atab.on { color: var(--gold); border-bottom-color: var(--gold); }
+.admin-body { max-width: 760px; margin:0 auto; padding: 26px 20px 80px; }
+.tab-panel { display:none; }
+.tab-panel.on { display:block; }
+.panel-head { margin-bottom:18px; }
+.panel-head h2 { font-family:'Playfair Display',serif; font-size:22px; font-weight:800; }
+.panel-head p { font-size:12.5px; color:var(--muted); margin-top:4px; }
+
+.form-group { margin-bottom: 15px; }
+.form-label { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 11px 12px; background: var(--n3); border: 1px solid var(--line); border-radius: var(--r); font-size: 13.5px; color: #121212; outline: none; transition: 0.2s; }
+.form-input::placeholder, .form-textarea::placeholder { color: var(--muted2); }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(10,10,10,0.08); }
+.form-textarea { min-height: 70px; resize: vertical; }
+.form-select { cursor: pointer; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-hint { font-size:11px; color:var(--muted2); margin-top:5px; }
+
+.photo-zone { width: 100%; aspect-ratio: 16/7; border: 2px dashed rgba(10,10,10,0.28); border-radius: var(--r); background: var(--n3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; cursor: pointer; transition: 0.22s; position: relative; overflow: hidden; }
+.photo-zone:hover { border-color: var(--gold); background: rgba(10,10,10,0.04); }
+.photo-zone.has-preview { border-style: solid; border-color: rgba(10,10,10,0.3); }
+.photo-icon { color: var(--muted2); display: flex; }
+.photo-icon svg { width: 24px; height: 24px; }
+.photo-text { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.photo-sub { font-size: 10px; color: var(--muted2); }
+#photo-input { display: none; }
+.preview-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.preview-clear { position: absolute; top: 7px; right: 7px; width: 25px; height: 25px; background: rgba(9,9,9,0.8); color: #fff; border: none; border-radius: 50%; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+
+.btn-publish { width: 100%; padding: 13px; margin-top: 6px; background: var(--goldg); color: #fff; border: none; border-radius: var(--r); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: 0.22s; box-shadow: 0 4px 18px rgba(10,10,10,0.2); }
+.btn-publish:hover { box-shadow: 0 6px 26px rgba(10,10,10,0.35); }
+.btn-publish:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+#status-bar { padding: 9px 12px; border-radius: var(--r); font-size: 12.5px; font-weight: 600; margin-bottom: 13px; display: none; border: 1px solid; }
+.s-ok { background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.18); color: #16a34a; }
+.s-err { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.18); color: var(--err); }
+.s-wait { background: var(--n3); border-color: var(--line); color: var(--muted); }
+
+.admin-row { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.admin-row:last-child { border-bottom: none; }
+.admin-row img { width: 44px; height: 44px; object-fit: cover; border-radius: var(--r); background: var(--n4); flex-shrink: 0; }
+.admin-row-info { flex: 1; min-width: 0; }
+.admin-row-name { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-row-price { font-size: 11.5px; color: var(--gold); font-weight: 700; }
+.delete-btn { width: 28px; height: 28px; background: rgba(239,68,68,0.08); border: none; border-radius: var(--r); cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; color: var(--err); transition: 0.18s; flex-shrink: 0; }
+.delete-btn:hover { background: var(--err); color: white; }
+
+/* Livraison */
+.co-block { background:#fff; border:1px solid var(--line); border-radius:var(--r2); padding:18px; margin-bottom:16px; }
+.co-block h3 { font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--gold); font-weight:800; margin-bottom:12px; }
+#adminmap { width:100%; height:260px; border-radius:var(--r); border:1px solid var(--line); margin-bottom:10px; }
+.map-search-wrap { position:relative; margin-bottom:10px; }
+#admin-addr-search { width:100%; padding:11px 13px; background:var(--n3); border:1px solid var(--line2); border-radius:var(--r); font-size:13px; outline:none; }
+#admin-addr-suggest { position:absolute; top:calc(100% + 6px); left:0; right:0; background:#fff; border:1px solid var(--line2); border-radius:var(--r); box-shadow:0 16px 40px rgba(10,10,10,0.14); z-index:50; display:none; max-height:220px; overflow-y:auto; }
+.addr-opt { padding:10px 13px; font-size:12.5px; cursor:pointer; border-bottom:1px solid var(--line); }
+.addr-opt:last-child { border-bottom:none; }
+.addr-opt:hover { background:var(--n3); }
+.sim-box { background:var(--n3); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; font-size:12.5px; color:var(--gold2); margin-top:4px; }
+.sim-box b { color:var(--gold); }
+
+#toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(10px); background: #121212; border: 1px solid var(--line2); color: #fff; padding: 10px 22px; border-radius: 50px; font-size: 12.5px; font-weight: 600; z-index: 9999; opacity: 0; transition: 0.3s var(--ease); pointer-events: none; white-space: nowrap; box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.t-ok { border-color: rgba(34,197,94,0.4); }
+#toast.t-err { border-color: rgba(239,68,68,0.4); }
+</style>
+</head>
+<body>
+
+<!-- PW GATE -->
+<div id="pw-screen">
+  <div class="pw-box" id="pw-box">
+    <div class="pw-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="1.5"/><path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5"/></svg></div>
+    <div class="pw-title">MAISON AVENZO</div>
+    <div class="pw-sub">Gestion des produits — accès privé</div>
+    <input type="password" id="pw-input" class="pw-input" placeholder="••••••" autofocus onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">Entrer</button>
+    <div id="pw-err" class="pw-err">Mot de passe incorrect</div>
+    <a class="pw-back" href="maison-avenzo.html">← Retour à la boutique</a>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="admin-screen">
+  <div class="admin-top">
+    <div class="admin-title"><em>Gestion</em> boutique<small>MAISON AVENZO</small></div>
+    <div class="top-actions">
+      <a class="view-site-link" href="maison-avenzo.html" target="_blank">Voir le site</a>
+      <button class="logout-btn" onclick="location.reload()">Se déconnecter</button>
+    </div>
+  </div>
+  <div class="admin-tabs">
+    <button class="atab on" onclick="switchTab('add',this)">Ajouter produit</button>
+    <button class="atab" onclick="switchTab('list',this)">Mes produits</button>
+    <button class="atab" onclick="switchTab('livraison',this)">Livraison</button>
+    <button class="atab" onclick="switchTab('commandes',this)">Commandes</button>
+  </div>
+  <div class="admin-body">
+
+    <!-- AJOUTER -->
+    <div class="tab-panel on" id="tab-add">
+      <div class="panel-head"><h2>Ajouter un produit</h2><p>Il apparaîtra instantanément sur le site.</p></div>
+      <div id="status-bar"></div>
+      <div class="form-group">
+        <label class="form-label">Photo</label>
+        <div class="photo-zone" id="photo-zone" onclick="document.getElementById('photo-input').click()">
+          <div class="photo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+          <div class="photo-text">Cliquez pour ajouter une photo</div>
+          <div class="photo-sub">JPG, PNG — compressée automatiquement</div>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" onchange="handlePhoto(this)">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Nom du produit</label><input class="form-input" id="f-name" placeholder="Ex : Nike Air Max 90"></div>
+        <div class="form-group"><label class="form-label">Catégorie</label>
+          <select class="form-select" id="f-cat">
+            <option value="chaussures">Sneakers</option>
+            <option value="crampons">Crampons</option>
+            <option value="vetements">Vêtements</option>
+            <option value="sandales">Sandales</option>
+            <option value="accessoires">Accessoires</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Prix (FCFA)</label><input class="form-input" id="f-price" type="number" placeholder="Ex : 15000"></div>
+      <div class="form-group"><label class="form-label">Description (optionnel)</label><textarea class="form-textarea" id="f-desc" placeholder="Taille, état, détails…"></textarea></div>
+      <button class="btn-publish" id="pub-btn" onclick="addProduct()">Publier le produit</button>
+    </div>
+
+    <!-- LISTE -->
+    <div class="tab-panel" id="tab-list">
+      <div class="panel-head"><h2>Mes produits</h2><p>Supprimez un article pour le retirer du site.</p></div>
+      <div id="admin-list"></div>
+    </div>
+
+    <!-- LIVRAISON -->
+    <div class="tab-panel" id="tab-livraison">
+      <div class="panel-head"><h2>Zone &amp; prix de livraison</h2><p>Le client tape son adresse sur une carte interactive et voit le prix automatiquement, calculé depuis votre boutique.</p></div>
+
+      <div class="co-block">
+        <h3>Emplacement de votre boutique</h3>
+        <div class="map-search-wrap">
+          <input id="admin-addr-search" class="form-input" placeholder="Rechercher l'adresse de la boutique…" oninput="onAdminAddrInput(this.value)">
+          <div id="admin-addr-suggest"></div>
+        </div>
+        <div id="adminmap"></div>
+        <div class="form-hint">Cliquez sur la carte ou glissez le repère pour définir précisément l'emplacement de votre boutique.</div>
+      </div>
+
+      <div class="co-block">
+        <h3>Formule de calcul</h3>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Prix de base (FCFA)</label><input class="form-input" id="dl-base" type="number" placeholder="1500"></div>
+          <div class="form-group"><label class="form-label">Rayon inclus (km)</label><input class="form-input" id="dl-radius" type="number" step="0.5" placeholder="4"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Prix par km au-delà</label><input class="form-input" id="dl-perkm" type="number" placeholder="300"></div>
+          <div class="form-group"><label class="form-label">Arrondi (FCFA)</label><input class="form-input" id="dl-round" type="number" placeholder="100"></div>
+        </div>
+        <div class="form-hint">Exemple : la plupart des livraisons dans un rayon de <b id="ex-radius">4</b> km coûteront <b id="ex-base">1 500 FCFA</b>. Au-delà, le prix augmente selon la distance réelle.</div>
+        <div class="sim-box" id="sim-box">Cliquez sur la carte pour tester un prix.</div>
+        <button class="btn-publish" id="dl-save-btn" onclick="saveDeliveryConfig()">Enregistrer la configuration</button>
+      </div>
+    </div>
+
+    <!-- COMMANDES -->
+    <div class="tab-panel" id="tab-commandes">
+      <div class="panel-head"><h2>Commandes reçues</h2><p>Les 30 dernières commandes passées sur le site.</p></div>
+      <div id="orders-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, doc, getDoc, setDoc, deleteDoc, getDocs, query, orderBy, limit, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const PASS = "avenzo225";
+const ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></svg>';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5N6KMhtawa5_P5k9RtJy0J8Iy6m-Khho",
+  authDomain: "jojo-sneakers-66c51.firebaseapp.com",
+  projectId: "jojo-sneakers-66c51",
+  storageBucket: "jojo-sneakers-66c51.firebasestorage.app",
+  messagingSenderId: "116930637247",
+  appId: "1:116930637247:web:9f89c6b7ebe1209851050a",
+  measurementId: "G-39Z55YPL73"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const COL = 'produits';
+
+window.photoData = null;
+let DELIVERY_CFG = { lat: 5.320357, lng: -4.023328, base: 1500, radiusKm: 50, perKm: 0, roundTo: 100, label: 'MAISON AVENZO' };
+
+function fmt(p) { const n = parseInt(p); return isNaN(n) ? p : n.toLocaleString('fr-FR') + ' FCFA'; }
+
+/* ─── ACCÈS ─────────────────────────── */
+function checkPw() {
+  if (document.getElementById('pw-input').value === PASS) {
+    document.getElementById('pw-screen').style.display = 'none';
+    document.getElementById('admin-screen').classList.add('open');
+    renderAdminList();
+    loadDeliveryConfig().then(initAdminMap);
+  } else {
+    document.getElementById('pw-err').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+  }
+}
+window.checkPw = checkPw;
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.atab').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('on'));
+  document.getElementById('tab-'+tab).classList.add('on');
+  if (tab === 'list') renderAdminList();
+  if (tab === 'livraison' && adminMap) setTimeout(()=>adminMap.invalidateSize(), 80);
+  if (tab === 'commandes') renderOrders();
+}
+window.switchTab = switchTab;
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg; el.className = cls; el.style.display = 'block';
+  if (cls === 's-ok') setTimeout(() => el.style.display = 'none', 3000);
+}
+function showToast(msg, cls = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + cls;
+  setTimeout(() => t.className = cls, 3000);
+}
+
+/* ─── PHOTO ─────────────────────────── */
+function handlePhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img2 = new Image();
+    img2.onload = () => {
+      const canvas = document.createElement('canvas');
+      const max = 900;
+      const ratio = Math.min(max / img2.width, max / img2.height, 1);
+      canvas.width  = img2.width  * ratio;
+      canvas.height = img2.height * ratio;
+      canvas.getContext('2d').drawImage(img2, 0, 0, canvas.width, canvas.height);
+      window.photoData = canvas.toDataURL('image/jpeg', 0.78);
+      renderPhotoPreview(window.photoData);
+    };
+    img2.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function renderPhotoPreview(src) {
+  const zone = document.getElementById('photo-zone');
+  zone.classList.add('has-preview');
+  zone.querySelector('.preview-img') && zone.querySelector('.preview-img').remove();
+  zone.querySelector('.preview-clear') && zone.querySelector('.preview-clear').remove();
+  const img = document.createElement('img'); img.className = 'preview-img'; img.src = src;
+  zone.appendChild(img);
+  const btn = document.createElement('button'); btn.className = 'preview-clear';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="11" height="11"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+  btn.onclick = e => { e.stopPropagation(); clearPhoto(); };
+  zone.appendChild(btn);
+}
+function clearPhoto() {
+  window.photoData = null;
+  const zone = document.getElementById('photo-zone');
+  zone.classList.remove('has-preview');
+  zone.querySelector('.preview-img') && zone.querySelector('.preview-img').remove();
+  zone.querySelector('.preview-clear') && zone.querySelector('.preview-clear').remove();
+  document.getElementById('photo-input').value = '';
+}
+window.handlePhoto = handlePhoto;
+window.clearPhoto = clearPhoto;
+
+/* ─── AJOUT PRODUIT ─────────────────── */
+async function addProduct() {
+  const name  = document.getElementById('f-name').value.trim();
+  const cat   = document.getElementById('f-cat').value;
+  const price = document.getElementById('f-price').value.trim();
+  const desc  = document.getElementById('f-desc').value.trim();
+
+  if (!name || !price || !window.photoData) {
+    setStatus('Veuillez ajouter une photo, un nom et un prix.', 's-err');
+    return;
+  }
+  const btn = document.getElementById('pub-btn');
+  btn.disabled = true;
+  setStatus('Publication en cours…', 's-wait');
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_15S')), 15000));
+
+  try {
+    await Promise.race([
+      addDoc(collection(db, COL), {
+        n: name, c: cat, p: price,
+        d: desc || `${name} — disponible chez MAISON AVENZO.`,
+        i: window.photoData,
+        createdAt: serverTimestamp()
+      }),
+      timeout
+    ]);
+    clearPhoto();
+    document.getElementById('f-name').value  = '';
+    document.getElementById('f-price').value = '';
+    document.getElementById('f-desc').value  = '';
+    setStatus('Produit publié avec succès ! Visible sur le site.', 's-ok');
+    showToast('Produit ajouté !', 't-ok');
+  } catch(e) {
+    console.error(e);
+    let msg = 'Erreur Firebase : ' + (e.code || e.message || 'inconnue');
+    if (e.message === 'TIMEOUT_15S') msg = 'Ça ne répond pas après 15s. Vérifie ta connexion internet.';
+    else if (e.code === 'permission-denied') msg = 'Accès refusé par Firestore : vérifie les règles de sécurité.';
+    setStatus(msg, 's-err');
+  }
+  btn.disabled = false;
+}
+window.addProduct = addProduct;
+
+/* ─── LISTE / SUPPRESSION ───────────── */
+async function renderAdminList() {
+  const el = document.getElementById('admin-list');
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Chargement…</div>';
+  let rows = '';
+  try {
+    const snap = await getDocs(query(collection(db, COL), orderBy('createdAt', 'asc')));
+    snap.docs.forEach(d => {
+      const p = d.data();
+      rows += `
+      <div class="admin-row">
+        <img src="${p.i||''}" alt="" onerror="this.style.display='none'">
+        <div class="admin-row-info">
+          <div class="admin-row-name">${p.n||''}</div>
+          <div class="admin-row-price">${fmt(p.p||'')}</div>
+        </div>
+        <button class="delete-btn" onclick="deleteProduct('${d.id}')">${ICON_TRASH}</button>
+      </div>`;
+    });
+  } catch(e) {}
+  el.innerHTML = rows || '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucun produit.</div>';
+}
+window.renderAdminList = renderAdminList;
+
+async function deleteProduct(id) {
+  if (!confirm('Supprimer ce produit ?')) return;
+  try {
+    await deleteDoc(doc(db, COL, id));
+    showToast('Produit supprimé', 't-err');
+    renderAdminList();
+  } catch(e) { showToast('Erreur suppression', 't-err'); }
+}
+window.deleteProduct = deleteProduct;
+
+/* ─── COMMANDES ─────────────────────── */
+async function renderOrders() {
+  const el = document.getElementById('orders-list');
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Chargement…</div>';
+  try {
+    const snap = await getDocs(query(collection(db,'commandes'), orderBy('createdAt','desc'), limit(30)));
+    if (snap.empty) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucune commande pour le moment.</div>'; return; }
+    el.innerHTML = snap.docs.map(d => {
+      const o = d.data();
+      return `<div class="co-block" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <b style="font-size:13px;">${o.orderNumber||''}</b>
+          <span style="font-size:12px;color:var(--gold);font-weight:700;">${fmt(o.total||0)}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted2);">${o.prenom||''} ${o.nom||''} — ${o.telephone||''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${o.adresse||''} ${o.distanceKm?('· '+o.distanceKm+' km'):''}</div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Impossible de charger les commandes.</div>'; }
+}
+window.renderOrders = renderOrders;
+
+/* ─── LIVRAISON : CONFIG ────────────── */
+async function loadDeliveryConfig() {
+  try {
+    const snap = await getDoc(doc(db,'config','livraison'));
+    if (snap.exists()) DELIVERY_CFG = { ...DELIVERY_CFG, ...snap.data() };
+  } catch(e) {}
+  document.getElementById('dl-base').value = DELIVERY_CFG.base;
+  document.getElementById('dl-radius').value = DELIVERY_CFG.radiusKm;
+  document.getElementById('dl-perkm').value = DELIVERY_CFG.perKm;
+  document.getElementById('dl-round').value = DELIVERY_CFG.roundTo;
+  updateExampleText();
+}
+function updateExampleText() {
+  document.getElementById('ex-radius').textContent = document.getElementById('dl-radius').value;
+  document.getElementById('ex-base').textContent = fmt(document.getElementById('dl-base').value);
+}
+['dl-base','dl-radius','dl-perkm','dl-round'].forEach(id => {
+  document.addEventListener('input', e => { if (e.target.id===id) { updateExampleText(); recomputeSim(); } });
+});
+
+let adminMap, adminMarker;
+function initAdminMap() {
+  const el = document.getElementById('adminmap');
+  if (!el || el._leaflet_id) return;
+  adminMap = L.map('adminmap').setView([DELIVERY_CFG.lat, DELIVERY_CFG.lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(adminMap);
+  adminMarker = L.marker([DELIVERY_CFG.lat, DELIVERY_CFG.lng], { draggable:true }).addTo(adminMap);
+  adminMarker.on('dragend', () => { const p=adminMarker.getLatLng(); DELIVERY_CFG.lat=p.lat; DELIVERY_CFG.lng=p.lng; recomputeSim(); });
+  adminMap.on('click', e => { adminMarker.setLatLng(e.latlng); DELIVERY_CFG.lat=e.latlng.lat; DELIVERY_CFG.lng=e.latlng.lng; recomputeSim(); });
+  setTimeout(()=>adminMap.invalidateSize(), 100);
+}
+function haversine(lat1,lng1,lat2,lng2) {
+  const R=6371, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function recomputeSim() {
+  const base = parseFloat(document.getElementById('dl-base').value)||0;
+  const radius = parseFloat(document.getElementById('dl-radius').value)||0;
+  const perKm = parseFloat(document.getElementById('dl-perkm').value)||0;
+  const roundTo = parseFloat(document.getElementById('dl-round').value)||100;
+  const testKm = radius + 3;
+  const extra = Math.ceil(testKm - radius);
+  const raw = base + extra*perKm;
+  const price = Math.ceil(raw/roundTo)*roundTo;
+  document.getElementById('sim-box').innerHTML = `Exemple : un client situé à <b>${testKm.toFixed(1)} km</b> de la boutique paierait environ <b>${fmt(price)}</b> de livraison.`;
+}
+
+let adminAddrDebounce;
+function onAdminAddrInput(val) {
+  clearTimeout(adminAddrDebounce);
+  const dd = document.getElementById('admin-addr-suggest');
+  if (val.trim().length < 3) { dd.style.display='none'; return; }
+  adminAddrDebounce = setTimeout(async () => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val+', Abidjan, Côte d\'Ivoire')}&countrycodes=ci&limit=5&accept-language=fr`);
+      const data = await res.json();
+      if (!data.length) { dd.innerHTML='<div class="addr-opt">Aucun lieu trouvé</div>'; dd.style.display='block'; return; }
+      dd.innerHTML = data.map(d => `<div class="addr-opt" onmousedown='window.pickAdminAddr(${d.lat},${d.lon})'>${d.display_name}</div>`).join('');
+      dd.style.display = 'block';
+    } catch(e) { dd.style.display='none'; }
+  }, 500);
+}
+window.onAdminAddrInput = onAdminAddrInput;
+window.pickAdminAddr = (lat,lng) => {
+  document.getElementById('admin-addr-suggest').style.display='none';
+  DELIVERY_CFG.lat = parseFloat(lat); DELIVERY_CFG.lng = parseFloat(lng);
+  if (adminMap) { adminMap.setView([DELIVERY_CFG.lat,DELIVERY_CFG.lng],15); adminMarker.setLatLng([DELIVERY_CFG.lat,DELIVERY_CFG.lng]); }
+  recomputeSim();
+};
+
+async function saveDeliveryConfig() {
+  const btn = document.getElementById('dl-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  const cfg = {
+    lat: DELIVERY_CFG.lat, lng: DELIVERY_CFG.lng, label: 'MAISON AVENZO',
+    base: parseFloat(document.getElementById('dl-base').value)||1500,
+    radiusKm: parseFloat(document.getElementById('dl-radius').value)||4,
+    perKm: parseFloat(document.getElementById('dl-perkm').value)||300,
+    roundTo: parseFloat(document.getElementById('dl-round').value)||100
+  };
+  try {
+    await setDoc(doc(db,'config','livraison'), cfg);
+    showToast('Livraison mise à jour !', 't-ok');
+  } catch(e) { showToast('Erreur d\'enregistrement', 't-err'); }
+  btn.disabled = false; btn.textContent = 'Enregistrer la configuration';
+}
+window.saveDeliveryConfig = saveDeliveryConfig;
+</script>
+</body>
+</html>
