@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 
 /* ── RESET & BASE ─────────────────────── */
@@ -257,6 +258,9 @@ a { text-decoration: none; color: inherit; }
 .qty-box { display:flex; align-items:center; border:1px solid var(--line2); border-radius:var(--r); overflow:hidden; }
 .qty-box button { width:36px; height:38px; background:var(--n3); border:none; cursor:pointer; font-size:15px; font-weight:700; color:var(--gold); }
 .qty-box span { width:38px; text-align:center; font-size:14px; font-weight:700; }
+.size-pill { min-width:42px; padding:9px 12px; text-align:center; border:1px solid var(--line2); border-radius:var(--r); background:#fff; font-size:12.5px; font-weight:700; color:var(--gold); cursor:pointer; transition:0.18s; }
+.size-pill:hover { border-color:var(--gold); }
+.size-pill.on { background:var(--goldg); color:#fff; border-color:transparent; }
 .detail-actions { display: flex; flex-direction: column; gap: 9px; }
 .btn-wa { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 15px 22px; background: var(--wa); color: #fff; border: none; border-radius: var(--r); font-size: 12.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: 0.24s var(--ease); }
 .btn-wa:hover { background: #1db954; transform: translateY(-2px); }
@@ -474,6 +478,11 @@ footer { background: #FFFFFF; border-top: 1px solid var(--line); padding: clamp(
         <span class="delivery-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
         <div><div class="delivery-title">Livraison disponible</div><div class="delivery-sub">Prix calculé selon votre adresse exacte</div></div>
       </div>
+      <div class="qty-row" id="d-size-row" style="flex-direction:column;align-items:stretch;">
+        <label class="form-label" style="margin-bottom:8px;">Taille</label>
+        <div id="d-sizes" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="d-size-err" style="display:none;font-size:11.5px;color:var(--err);margin-top:7px;">Merci de choisir une taille.</div>
+      </div>
       <div class="qty-row">
         <div class="qty-box"><button onclick="changeDetailQty(-1)">−</button><span id="d-qty">1</span><button onclick="changeDetailQty(1)">+</button></div>
       </div>
@@ -656,6 +665,14 @@ function getImg(p){ return p.i||p.img||''; }
 function getPrice(p){ return parseInt(p.p||p.price||0)||0; }
 function getCat(p){ return p.c||p.cat||''; }
 function getDesc(p){ return p.d||p.desc||''; }
+
+/* ─── TAILLES SELON LA CATÉGORIE ────── */
+function getSizeOptions(cat){
+  if (cat === 'chaussures' || cat === 'sandales') return ['36','37','38','39','40','41','42','43','44','45','46'];
+  if (cat === 'crampons') return ['38','39','40','41','42','43','44','45'];
+  if (cat === 'vetements') return ['XS','S','M','L','XL','XXL'];
+  return ['Taille unique'];
+}
 const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23F0F0EE' width='200' height='200'/%3E%3Cg fill='none' stroke='%23B3A88E' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='55' y='60' width='90' height='70' rx='4'/%3E%3Ccircle cx='78' cy='82' r='6'/%3E%3Cpath d='M55 118l24-22 18 15 15-13 33 30'/%3E%3C/g%3E%3C/svg%3E";
 function showToast(msg, cls=''){ const t=document.getElementById('toast'); t.textContent=msg; t.className='show '+cls; setTimeout(()=>t.className=cls,2600); }
 window.showToast = showToast;
@@ -825,7 +842,7 @@ window.doSearch = doSearch;
 
 /* ─── DÉTAIL PRODUIT (écran plein) ──── */
 function openDetail(p, pushHash=true) {
-  window.currentProduct = p; window.detailQty = 1;
+  window.currentProduct = p; window.detailQty = 1; window.detailSize = null;
   document.getElementById('d-img').src = getImg(p);
   document.getElementById('d-img').onerror = function(){this.src=PLACEHOLDER};
   document.getElementById('d-name').textContent = getName(p);
@@ -834,9 +851,20 @@ function openDetail(p, pushHash=true) {
   document.getElementById('d-cat').textContent = catLabel(getCat(p));
   document.getElementById('d-crumb').textContent = getName(p);
   document.getElementById('d-qty').textContent = '1';
+  document.getElementById('d-size-err').style.display = 'none';
+  const sizes = getSizeOptions(getCat(p));
+  const sizesEl = document.getElementById('d-sizes');
+  sizesEl.innerHTML = sizes.map(s => `<div class="size-pill" data-size="${s}" onclick="selectSize('${s}')">${s}</div>`).join('');
+  if (sizes.length === 1) { selectSize(sizes[0]); }
   showView('product');
   if (pushHash) location.hash = 'produit/'+p.id;
 }
+function selectSize(s) {
+  window.detailSize = s;
+  document.querySelectorAll('.size-pill').forEach(el => el.classList.toggle('on', el.dataset.size===s));
+  document.getElementById('d-size-err').style.display = 'none';
+}
+window.selectSize = selectSize;
 function changeDetailQty(d) {
   window.detailQty = Math.max(1, window.detailQty + d);
   document.getElementById('d-qty').textContent = window.detailQty;
@@ -844,7 +872,12 @@ function changeDetailQty(d) {
 window.changeDetailQty = changeDetailQty;
 function askOnWhatsapp() {
   const p = window.currentProduct; if (!p) return;
-  const msg = encodeURIComponent(`Bonjour, je suis intéressé(e) par : ${getName(p)} (${fmt(getPrice(p))})`);
+  if (!window.detailSize) {
+    document.getElementById('d-size-err').style.display = 'block';
+    document.getElementById('d-size-err').scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  const msg = encodeURIComponent(`Bonjour, je suis intéressé(e) par : ${getName(p)} — Taille ${window.detailSize} (${fmt(getPrice(p))})`);
   window.open(`https://wa.me/${WA_NUM}?text=${msg}`,'_blank');
 }
 window.askOnWhatsapp = askOnWhatsapp;
@@ -857,18 +890,41 @@ function updateCartBadge() {
   const b = document.getElementById('cart-badge');
   b.textContent = n; b.classList.toggle('hide', n===0);
 }
-function cartAdd(p, qty=1) {
-  const ex = window.CART.find(i=>i.id===p.id);
+function cartAdd(p, qty=1, size='Taille unique') {
+  const lineId = p.id + '__' + size;
+  const ex = window.CART.find(i=>i.id===lineId);
   if (ex) ex.qty += qty;
-  else window.CART.push({ id:p.id, n:getName(p), p:getPrice(p), i:getImg(p), qty });
+  else window.CART.push({ id:lineId, pid:p.id, n:getName(p), p:getPrice(p), i:getImg(p), taille:size, qty });
   saveCart();
   showToast('Ajouté au panier !','t-ok');
 }
-function quickAdd(id) { const p=window.ALL.find(x=>x.id===id); if(p) cartAdd(p,1); }
+function quickAdd(id) {
+  const p=window.ALL.find(x=>x.id===id); if(!p) return;
+  const sizes = getSizeOptions(getCat(p));
+  if (sizes.length === 1) { cartAdd(p,1,sizes[0]); return; }
+  go('produit/'+id);
+  showToast('Choisissez une taille pour cet article','t-err');
+}
 window.quickAdd = quickAdd;
-function addDetailToCart() { if(window.currentProduct) cartAdd(window.currentProduct, window.detailQty); }
+function addDetailToCart() {
+  if (!window.currentProduct) return;
+  if (!window.detailSize) {
+    document.getElementById('d-size-err').style.display = 'block';
+    document.getElementById('d-size-err').scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  cartAdd(window.currentProduct, window.detailQty, window.detailSize);
+}
 window.addDetailToCart = addDetailToCart;
-function buyNow() { if(!window.currentProduct) return; addDetailToCart(); go('cart'); }
+function buyNow() {
+  if (!window.currentProduct) return;
+  if (!window.detailSize) {
+    document.getElementById('d-size-err').style.display = 'block';
+    document.getElementById('d-size-err').scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  addDetailToCart(); go('cart');
+}
 window.buyNow = buyNow;
 
 function cartRemove(id) { window.CART = window.CART.filter(i=>i.id!==id); saveCart(); renderCart(); }
@@ -894,7 +950,7 @@ function renderCart() {
       <img src="${i.i}" onerror="this.src='${PLACEHOLDER}'">
       <div class="ci-info">
         <div class="ci-name">${i.n}</div>
-        <div class="ci-price">${fmt(i.p)}</div>
+        <div class="ci-price">${fmt(i.p)}${i.taille && i.taille!=='Taille unique' ? ' · Taille '+i.taille : ''}</div>
       </div>
       <div class="qty-box"><button onclick="cartQty('${i.id}',-1)">−</button><span>${i.qty}</span><button onclick="cartQty('${i.id}',1)">+</button></div>
       <button class="ci-remove" onclick="cartRemove('${i.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
@@ -914,7 +970,7 @@ function renderCheckout() {
   document.getElementById('co-items').innerHTML = window.CART.map(i => `
     <div class="co-summary-item">
       <img src="${i.i}" onerror="this.src='${PLACEHOLDER}'">
-      <div><div class="cosi-name">${i.n}</div><div class="cosi-qty">Qté ${i.qty}</div></div>
+      <div><div class="cosi-name">${i.n}</div><div class="cosi-qty">Qté ${i.qty}${i.taille && i.taille!=='Taille unique' ? ' · Taille '+i.taille : ''}</div></div>
       <div class="cosi-price">${fmt(i.p*i.qty)}</div>
     </div>`).join('');
   updateCheckoutTotal();
@@ -1046,20 +1102,21 @@ async function submitOrder() {
   try { await addDoc(collection(db,'commandes'), orderData); }
   catch(e) { console.warn('Commande non enregistrée sur Firestore', e); }
 
-  const itemsTxt = window.CART.map(i => `• ${i.n} x${i.qty} — ${fmt(i.p*i.qty)}`).join('\n');
-  const msg = encodeURIComponent(
-    `Nouvelle commande MAISON AVENZO\n`+
-    `N° commande : ${orderNumber}\n\n`+
-    `Client : ${fname} ${lname}\n`+
-    `Téléphone : +225 ${phone}\n`+
-    `Adresse : ${d.label}\n`+
-    (note ? `Précisions : ${note}\n` : '')+
-    `\nArticles :\n${itemsTxt}\n\n`+
-    `Sous-total : ${fmt(sub)}\n`+
-    `Livraison (${d.distanceKm.toFixed(1)} km) : ${fmt(d.price)}\n`+
-    `TOTAL à payer à la livraison : ${fmt(total)}`
-  );
-  window.open(`https://wa.me/${WA_NUM}?text=${msg}`,'_blank');
+  /* ─── Notification automatique par email au vendeur (invisible pour le client) ─── */
+  try {
+    const itemsTxt = window.CART.map(i => `${i.n}${i.taille && i.taille!=='Taille unique' ? ' (Taille '+i.taille+')' : ''} x${i.qty} — ${fmt(i.p*i.qty)}`).join('\n');
+    emailjs.send('VOTRE_SERVICE_ID', 'VOTRE_TEMPLATE_ID', {
+      order_number: orderNumber,
+      client_nom: `${fname} ${lname}`,
+      client_telephone: '+225 ' + phone,
+      adresse: d.label,
+      note: note || '—',
+      articles: itemsTxt,
+      sous_total: fmt(sub),
+      livraison: fmt(d.price),
+      total: fmt(total)
+    }, 'VOTRE_PUBLIC_KEY');
+  } catch(e) { console.warn('Notification email non envoyée', e); }
 
   document.getElementById('s-ordernum').textContent = orderNumber;
   window.CART = []; saveCart(); window.selectedDelivery = null;
