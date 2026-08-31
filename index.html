@@ -327,6 +327,8 @@ a { text-decoration: none; color: inherit; }
 .cosi-name { font-size:12.5px; font-weight:700; }
 .cosi-qty { font-size:11px; color:var(--muted); }
 .cosi-price { margin-left:auto; font-size:12.5px; font-weight:700; color:var(--gold); white-space:nowrap; }
+.co-size-select { margin-top:4px; padding:5px 9px; font-size:11.5px; font-weight:700; color:var(--gold); background:var(--n3); border:1px solid var(--line2); border-radius:6px; outline:none; }
+.co-size-select.co-size-missing { border-color:var(--err); color:var(--err); background:rgba(239,68,68,0.06); }
 .btn-submit-order { width:100%; padding:15px; background:var(--goldg); color:#fff; border:none; border-radius:var(--r); font-size:12px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:0.22s; margin-top:6px; }
 .btn-submit-order:hover { box-shadow:0 8px 26px rgba(10,10,10,0.3); transform:translateY(-2px); }
 .btn-submit-order:disabled { opacity:0.4; cursor:default; transform:none; box-shadow:none; }
@@ -481,7 +483,7 @@ footer { background: #FFFFFF; border-top: 1px solid var(--line); padding: clamp(
       <div class="qty-row" id="d-size-row" style="flex-direction:column;align-items:stretch;">
         <label class="form-label" style="margin-bottom:8px;">Taille</label>
         <div id="d-sizes" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-        <div id="d-size-err" style="display:none;font-size:11.5px;color:var(--err);margin-top:7px;">Merci de choisir une taille.</div>
+        <div id="d-size-err" style="display:none;font-size:11.5px;color:var(--muted);margin-top:7px;">Pas de panique, vous pourrez aussi choisir la taille juste avant d'envoyer votre commande.</div>
       </div>
       <div class="qty-row">
         <div class="qty-box"><button onclick="changeDetailQty(-1)">−</button><span id="d-qty">1</span><button onclick="changeDetailQty(1)">+</button></div>
@@ -851,10 +853,10 @@ function openDetail(p, pushHash=true) {
   document.getElementById('d-cat').textContent = catLabel(getCat(p));
   document.getElementById('d-crumb').textContent = getName(p);
   document.getElementById('d-qty').textContent = '1';
-  document.getElementById('d-size-err').style.display = 'none';
   const sizes = getSizeOptions(getCat(p));
   const sizesEl = document.getElementById('d-sizes');
   sizesEl.innerHTML = sizes.map(s => `<div class="size-pill" data-size="${s}" onclick="selectSize('${s}')">${s}</div>`).join('');
+  document.getElementById('d-size-err').style.display = sizes.length > 1 ? 'block' : 'none';
   if (sizes.length === 1) { selectSize(sizes[0]); }
   showView('product');
   if (pushHash) location.hash = 'produit/'+p.id;
@@ -872,12 +874,8 @@ function changeDetailQty(d) {
 window.changeDetailQty = changeDetailQty;
 function askOnWhatsapp() {
   const p = window.currentProduct; if (!p) return;
-  if (!window.detailSize) {
-    document.getElementById('d-size-err').style.display = 'block';
-    document.getElementById('d-size-err').scrollIntoView({behavior:'smooth', block:'center'});
-    return;
-  }
-  const msg = encodeURIComponent(`Bonjour, je suis intéressé(e) par : ${getName(p)} — Taille ${window.detailSize} (${fmt(getPrice(p))})`);
+  const tailleTxt = window.detailSize ? ` — Taille ${window.detailSize}` : '';
+  const msg = encodeURIComponent(`Bonjour, je suis intéressé(e) par : ${getName(p)}${tailleTxt} (${fmt(getPrice(p))})`);
   window.open(`https://wa.me/${WA_NUM}?text=${msg}`,'_blank');
 }
 window.askOnWhatsapp = askOnWhatsapp;
@@ -890,8 +888,8 @@ function updateCartBadge() {
   const b = document.getElementById('cart-badge');
   b.textContent = n; b.classList.toggle('hide', n===0);
 }
-function cartAdd(p, qty=1, size='Taille unique') {
-  const lineId = p.id + '__' + size;
+function cartAdd(p, qty=1, size=null) {
+  const lineId = p.id + '__' + (size || '_sans-taille');
   const ex = window.CART.find(i=>i.id===lineId);
   if (ex) ex.qty += qty;
   else window.CART.push({ id:lineId, pid:p.id, n:getName(p), p:getPrice(p), i:getImg(p), taille:size, qty });
@@ -901,28 +899,17 @@ function cartAdd(p, qty=1, size='Taille unique') {
 function quickAdd(id) {
   const p=window.ALL.find(x=>x.id===id); if(!p) return;
   const sizes = getSizeOptions(getCat(p));
-  if (sizes.length === 1) { cartAdd(p,1,sizes[0]); return; }
-  go('produit/'+id);
-  showToast('Choisissez une taille pour cet article','t-err');
+  const size = sizes.length === 1 ? sizes[0] : null;
+  cartAdd(p, 1, size);
 }
 window.quickAdd = quickAdd;
 function addDetailToCart() {
   if (!window.currentProduct) return;
-  if (!window.detailSize) {
-    document.getElementById('d-size-err').style.display = 'block';
-    document.getElementById('d-size-err').scrollIntoView({behavior:'smooth', block:'center'});
-    return;
-  }
   cartAdd(window.currentProduct, window.detailQty, window.detailSize);
 }
 window.addDetailToCart = addDetailToCart;
 function buyNow() {
   if (!window.currentProduct) return;
-  if (!window.detailSize) {
-    document.getElementById('d-size-err').style.display = 'block';
-    document.getElementById('d-size-err').scrollIntoView({behavior:'smooth', block:'center'});
-    return;
-  }
   addDetailToCart(); go('cart');
 }
 window.buyNow = buyNow;
@@ -967,14 +954,40 @@ window.renderCart = renderCart;
 
 /* ─── CHECKOUT : RÉSUMÉ ─────────────── */
 function renderCheckout() {
-  document.getElementById('co-items').innerHTML = window.CART.map(i => `
+  document.getElementById('co-items').innerHTML = window.CART.map(i => {
+    const prod = window.ALL.find(x=>x.id===i.pid);
+    const sizes = prod ? getSizeOptions(getCat(prod)) : [];
+    const needsSize = sizes.length > 1;
+    const sizeField = needsSize ? `
+      <select class="co-size-select ${!i.taille?'co-size-missing':''}" onchange="setCartItemSize('${i.id}', this.value)">
+        <option value="" ${!i.taille?'selected':''} disabled>Choisir la taille</option>
+        ${sizes.map(s=>`<option value="${s}" ${i.taille===s?'selected':''}>${s}</option>`).join('')}
+      </select>` : (i.taille && i.taille!=='Taille unique' ? `<div class="cosi-qty">Taille ${i.taille}</div>` : '');
+    return `
     <div class="co-summary-item">
       <img src="${i.i}" onerror="this.src='${PLACEHOLDER}'">
-      <div><div class="cosi-name">${i.n}</div><div class="cosi-qty">Qté ${i.qty}${i.taille && i.taille!=='Taille unique' ? ' · Taille '+i.taille : ''}</div></div>
+      <div style="flex:1;min-width:0;">
+        <div class="cosi-name">${i.n}</div>
+        <div class="cosi-qty">Qté ${i.qty}</div>
+        ${sizeField}
+      </div>
       <div class="cosi-price">${fmt(i.p*i.qty)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   updateCheckoutTotal();
 }
+function setCartItemSize(oldLineId, newSize) {
+  if (!newSize) return;
+  const it = window.CART.find(x=>x.id===oldLineId); if (!it) return;
+  const newLineId = it.pid + '__' + newSize;
+  if (newLineId === it.id) return;
+  const dup = window.CART.find(x=>x.id===newLineId);
+  if (dup) { dup.qty += it.qty; window.CART = window.CART.filter(x=>x!==it); }
+  else { it.id = newLineId; it.taille = newSize; }
+  saveCart();
+  renderCheckout();
+}
+window.setCartItemSize = setCartItemSize;
 function updateCheckoutTotal() {
   const sub = cartTotal();
   document.getElementById('cs-subtotal').textContent = fmt(sub);
@@ -1083,6 +1096,16 @@ async function submitOrder() {
   if (!fname || !lname || !phone || !d) {
     errEl.textContent = 'Merci de renseigner vos infos et de choisir une adresse sur la carte.';
     errEl.style.display = 'block';
+    return;
+  }
+  const missingSize = window.CART.some(i => {
+    const prod = window.ALL.find(x=>x.id===i.pid);
+    return prod && getSizeOptions(getCat(prod)).length > 1 && !i.taille;
+  });
+  if (missingSize) {
+    errEl.textContent = 'Merci de choisir la taille de chaque article dans le récapitulatif ci-dessus avant de valider.';
+    errEl.style.display = 'block';
+    errEl.scrollIntoView({behavior:'smooth', block:'center'});
     return;
   }
   errEl.style.display = 'none';
