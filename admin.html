@@ -25,7 +25,7 @@ body { font-family: 'Syne', sans-serif; background: #FAFAF8; color: #121212; min
 a { color:inherit; text-decoration:none; }
 
 /* PW GATE — plein écran */
-#pw-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+#pw-screen { display:none; }
 .pw-box { background: #FFFFFF; border: 1px solid var(--line2); border-radius: var(--r2); padding: 40px 30px; width: 100%; max-width: 340px; text-align: center; animation: modalIn 0.3s var(--slow); box-shadow: 0 24px 64px rgba(10,10,10,0.1); }
 .pw-icon { color: var(--gold); margin-bottom: 12px; display: flex; justify-content: center; }
 .pw-icon svg { width: 30px; height: 30px; }
@@ -40,7 +40,7 @@ a { color:inherit; text-decoration:none; }
 .pw-back:hover { color: var(--gold); }
 
 /* ADMIN — plein écran, sections par onglet (pas de fenêtre popup) */
-#admin-screen { display:none; min-height:100vh; }
+#admin-screen { display:block; min-height:100vh; }
 #admin-screen.open { display:block; }
 .admin-top { position:sticky; top:0; z-index:50; background:rgba(250,250,248,0.97); backdrop-filter:blur(18px); border-bottom:1px solid var(--line); padding: 16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .admin-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
@@ -120,25 +120,12 @@ a { color:inherit; text-decoration:none; }
 </head>
 <body>
 
-<!-- PW GATE -->
-<div id="pw-screen">
-  <div class="pw-box" id="pw-box">
-    <div class="pw-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="1.5"/><path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5"/></svg></div>
-    <div class="pw-title">MAISON AVENZO</div>
-    <div class="pw-sub">Gestion des produits — accès privé</div>
-    <input type="password" id="pw-input" class="pw-input" placeholder="••••••" autofocus onkeydown="if(event.key==='Enter')checkPw()">
-    <button class="pw-btn" onclick="checkPw()">Entrer</button>
-    <div id="pw-err" class="pw-err">Mot de passe incorrect</div>
-    <a class="pw-back" href="maison-avenzo.html">← Retour à la boutique</a>
-  </div>
-</div>
-
 <!-- ADMIN -->
 <div id="admin-screen">
   <div class="admin-top">
     <div class="admin-title"><em>Gestion</em> boutique<small>MAISON AVENZO</small></div>
     <div class="top-actions">
-      <a class="view-site-link" href="maison-avenzo.html" target="_blank">Voir le site</a>
+      <a class="view-site-link" href="index.html" target="_blank">Voir le site</a>
       <button class="logout-btn" onclick="location.reload()">Se déconnecter</button>
     </div>
   </div>
@@ -183,6 +170,9 @@ a { color:inherit; text-decoration:none; }
     <!-- LISTE -->
     <div class="tab-panel" id="tab-list">
       <div class="panel-head"><h2>Mes produits</h2><p>Supprimez un article pour le retirer du site.</p></div>
+      <div class="form-group">
+        <input class="form-input" id="admin-search" placeholder="Rechercher un produit…" oninput="filterAdminList(this.value)">
+      </div>
       <div id="admin-list"></div>
     </div>
 
@@ -254,19 +244,9 @@ let DELIVERY_CFG = { lat: 5.320357, lng: -4.023328, base: 1500, radiusKm: 50, pe
 
 function fmt(p) { const n = parseInt(p); return isNaN(n) ? p : n.toLocaleString('fr-FR') + ' FCFA'; }
 
-/* ─── ACCÈS ─────────────────────────── */
-function checkPw() {
-  if (document.getElementById('pw-input').value === PASS) {
-    document.getElementById('pw-screen').style.display = 'none';
-    document.getElementById('admin-screen').classList.add('open');
-    renderAdminList();
-    loadDeliveryConfig().then(initAdminMap);
-  } else {
-    document.getElementById('pw-err').style.display = 'block';
-    document.getElementById('pw-input').value = '';
-  }
-}
-window.checkPw = checkPw;
+/* ─── INIT (accès libre, sans mot de passe) ─── */
+renderAdminList();
+loadDeliveryConfig().then(initAdminMap);
 
 function switchTab(tab, btn) {
   document.querySelectorAll('.atab').forEach(b => b.classList.remove('on'));
@@ -377,27 +357,42 @@ async function addProduct() {
 }
 window.addProduct = addProduct;
 
-/* ─── LISTE / SUPPRESSION ───────────── */
+/* ─── LISTE / RECHERCHE / SUPPRESSION ───────────── */
+let ADMIN_PRODUCTS = [];
+
+function paintAdminList(list) {
+  const el = document.getElementById('admin-list');
+  let rows = '';
+  list.forEach(p => {
+    rows += `
+    <div class="admin-row">
+      <img src="${p.i||''}" alt="" onerror="this.style.display='none'">
+      <div class="admin-row-info">
+        <div class="admin-row-name">${p.n||''}</div>
+        <div class="admin-row-price">${fmt(p.p||'')}</div>
+      </div>
+      <button class="delete-btn" onclick="deleteProduct('${p.id}')">${ICON_TRASH}</button>
+    </div>`;
+  });
+  el.innerHTML = rows || '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucun produit.</div>';
+}
+
+function filterAdminList(q) {
+  const term = (q||'').trim().toLowerCase();
+  const filtered = term ? ADMIN_PRODUCTS.filter(p => (p.n||'').toLowerCase().includes(term)) : ADMIN_PRODUCTS;
+  paintAdminList(filtered);
+}
+window.filterAdminList = filterAdminList;
+
 async function renderAdminList() {
   const el = document.getElementById('admin-list');
   el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Chargement…</div>';
-  let rows = '';
   try {
     const snap = await getDocs(query(collection(db, COL), orderBy('createdAt', 'asc')));
-    snap.docs.forEach(d => {
-      const p = d.data();
-      rows += `
-      <div class="admin-row">
-        <img src="${p.i||''}" alt="" onerror="this.style.display='none'">
-        <div class="admin-row-info">
-          <div class="admin-row-name">${p.n||''}</div>
-          <div class="admin-row-price">${fmt(p.p||'')}</div>
-        </div>
-        <button class="delete-btn" onclick="deleteProduct('${d.id}')">${ICON_TRASH}</button>
-      </div>`;
-    });
-  } catch(e) {}
-  el.innerHTML = rows || '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Aucun produit.</div>';
+    ADMIN_PRODUCTS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) { ADMIN_PRODUCTS = []; }
+  const searchInput = document.getElementById('admin-search');
+  filterAdminList(searchInput ? searchInput.value : '');
 }
 window.renderAdminList = renderAdminList;
 

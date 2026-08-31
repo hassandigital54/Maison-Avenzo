@@ -131,7 +131,16 @@ a { text-decoration: none; color: inherit; }
 @media (max-width: 860px) {
   .nav-links { display: none; }
   .burger { display: flex; }
+  .nav-search-wrap { display: none; }
+  #mobile-search-bar { display: block; }
 }
+#mobile-search-bar { display: none; position: sticky; top: 60px; z-index: 480; background: #FAFAF8; border-bottom: 1px solid var(--line); padding: 10px 14px; }
+#mobile-search-bar-inner { position: relative; }
+#msearch { width: 100%; padding: 10px 14px 10px 38px; background: #F0F0EE; border: 1px solid var(--line); border-radius: 50px; font-size: 13.5px; color: #121212; outline: none; transition: 0.2s var(--ease); }
+#msearch:focus { border-color: var(--gold); }
+#mobile-search-bar .map-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--muted); display:flex; pointer-events:none; }
+#mobile-search-bar .map-search-icon svg { width:15px; height:15px; }
+#msresults { display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #FFFFFF; border: 1px solid var(--line2); border-radius: var(--r2); box-shadow: 0 16px 48px rgba(10,10,10,0.15); overflow: hidden; z-index: 999; max-height: 360px; overflow-y: auto; }
 
 /* ── VIEWS (écrans plein) ─────────────── */
 .view { display: none; }
@@ -349,6 +358,12 @@ footer { background: #FFFFFF; border-top: 1px solid var(--line); padding: clamp(
 .hd-link { color: var(--gold); font-weight: 700; transition: 0.18s; }
 .hd-link:hover { color: var(--gold2); }
 
+@media (max-width: 380px) {
+  #nav { padding: 0 12px; }
+  .nav-logo-name { font-size: 14px; }
+  #wa-float-btn { width: 46px; height: 46px; bottom: 16px; right: 14px; }
+}
+
 #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(10px); background: #121212; color: #fff; padding: 10px 22px; border-radius: 50px; font-size: 12.5px; font-weight: 600; z-index: 9999; opacity: 0; transition: 0.3s var(--ease); pointer-events: none; white-space: nowrap; box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -393,9 +408,17 @@ footer { background: #FFFFFF; border-top: 1px solid var(--line); padding: clamp(
   <button class="burger" id="burger" onclick="toggleDrawer()"><span></span><span></span><span></span></button>
 </div>
 
+<!-- BARRE DE RECHERCHE MOBILE (toujours visible sous le menu, sans passer par le burger) -->
+<div id="mobile-search-bar">
+  <div id="mobile-search-bar-inner">
+    <span class="map-search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></span>
+    <input id="msearch" type="text" placeholder="Rechercher un article…" oninput="doSearch(this.value,'msresults')" onfocus="if(this.value)doSearch(this.value,'msresults')">
+    <div id="msresults"></div>
+  </div>
+</div>
+
 <!-- DRAWER -->
 <div id="drawer">
-  <input class="drawer-search" type="text" placeholder="Rechercher un article…" oninput="doSearch(this.value)">
   <div id="drawer-links"></div>
 </div>
 
@@ -665,6 +688,7 @@ function route() {
   const h = location.hash.replace('#','');
   closeDrawer();
   document.getElementById('sresults').style.display='none';
+  document.getElementById('msresults').style.display='none';
   if (h.startsWith('produit/')) {
     const id = h.split('/')[1];
     const p = window.ALL.find(x=>x.id===id);
@@ -709,7 +733,9 @@ function filterCat(cat, btn) {
 window.filterCat = filterCat;
 
 function applyFilter(q='') {
-  const sq = q || document.getElementById('nsearch').value.toLowerCase();
+  const nsearchEl = document.getElementById('nsearch');
+  const msearchEl = document.getElementById('msearch');
+  const sq = q || (nsearchEl ? nsearchEl.value.toLowerCase() : '') || (msearchEl ? msearchEl.value.toLowerCase() : '');
   window.FILTERED = window.ALL.filter(p => {
     const mc = window.currentCat==='all' || getCat(p)===window.currentCat;
     const ms = !sq || getName(p).toLowerCase().includes(sq) || getDesc(p).toLowerCase().includes(sq);
@@ -781,10 +807,10 @@ function handleCard(id) { const p=window.ALL.find(x=>x.id===id); if(p) go('produ
 window.handleCard = handleCard;
 
 /* ─── SEARCH ────────────────────────── */
-function doSearch(val) {
+function doSearch(val, resultsId) {
   const q = val.toLowerCase().trim();
   applyFilter(q);
-  const dd = document.getElementById('sresults');
+  const dd = document.getElementById(resultsId || 'sresults');
   if (!q) { dd.style.display='none'; return; }
   const hits = window.ALL.filter(p=>getName(p).toLowerCase().includes(q)).slice(0,6);
   if (!hits.length) { dd.innerHTML='<div class="sr-none">Aucun résultat</div>'; dd.style.display='block'; return; }
@@ -1064,6 +1090,7 @@ window.toggleDrawer = toggleDrawer; window.closeDrawer = closeDrawer;
 
 document.addEventListener('click', e => {
   if (!e.target.closest('.nav-search-wrap')) document.getElementById('sresults').style.display='none';
+  if (!e.target.closest('#mobile-search-bar')) document.getElementById('msresults').style.display='none';
 });
 
 init();
